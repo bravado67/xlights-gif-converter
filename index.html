@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>xLights GIF Effect Converter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #0f0f1a;
+    --border: #1a1a2e;
+    --accent: #00ff88;
+    --accent2: #ff3366;
+    --accent3: #00aaff;
+    --text: #e0e0ff;
+    --text-dim: #6060a0;
+    --glow: 0 0 20px rgba(0,255,136,0.4);
+    --glow2: 0 0 20px rgba(255,51,102,0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: gridScroll 20s linear infinite;
+    pointer-events: none;
+  }
+
+  @keyframes gridScroll {
+    0% { background-position: 0 0; }
+    100% { background-position: 40px 40px; }
+  }
+
+  /* Scanlines */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.15) 2px,
+      rgba(0,0,0,0.15) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .container {
+    width: min(680px, 95vw);
+    position: relative;
+    z-index: 10;
+    padding: 20px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .logo {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: clamp(1.4rem, 4vw, 2rem);
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-shadow: var(--glow);
+    line-height: 1.1;
+  }
+
+  .logo span {
+    color: var(--accent2);
+    text-shadow: var(--glow2);
+  }
+
+  .subtitle {
+    margin-top: 10px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .badge {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 4px 12px;
+    border: 1px solid var(--accent3);
+    color: var(--accent3);
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 2px dashed var(--text-dim);
+    border-radius: 4px;
+    padding: 60px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .drop-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(0,255,136,0.05) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .drop-zone:hover::before,
+  .drop-zone.drag-over::before {
+    opacity: 1;
+  }
+
+  .drop-zone:hover,
+  .drop-zone.drag-over {
+    border-color: var(--accent);
+    border-style: solid;
+    box-shadow: var(--glow), inset 0 0 40px rgba(0,255,136,0.05);
+  }
+
+  .drop-zone.drag-over {
+    transform: scale(1.01);
+  }
+
+  .drop-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    display: block;
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .drop-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  .drop-sub {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+
+  .drop-sub span {
+    color: var(--accent);
+  }
+
+  #fileInput {
+    display: none;
+  }
+
+  /* Status panel */
+  .status-panel {
+    display: none;
+    margin-top: 24px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 20px;
+    position: relative;
+  }
+
+  .status-panel::before {
+    content: 'PROCESSING LOG';
+    position: absolute;
+    top: -8px;
+    left: 16px;
+    background: var(--surface);
+    padding: 0 8px;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+  }
+
+  .log-line {
+    font-size: 0.75rem;
+    line-height: 2;
+    color: var(--text-dim);
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+  }
+
+  .log-line .prefix { color: var(--accent3); flex-shrink: 0; }
+  .log-line.success .prefix { color: var(--accent); }
+  .log-line.error .prefix { color: var(--accent2); }
+  .log-line.info .msg { color: var(--text); }
+
+  /* Results */
+  .results {
+    display: none;
+    margin-top: 24px;
+  }
+
+  .result-card {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 20px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+
+  .result-card.success {
+    border-color: rgba(0,255,136,0.3);
+  }
+
+  .result-card.none {
+    border-color: rgba(0,170,255,0.3);
+  }
+
+  .result-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+    letter-spacing: 0.05em;
+  }
+
+  .result-title.green { color: var(--accent); text-shadow: var(--glow); }
+  .result-title.blue { color: var(--accent3); }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .stat {
+    background: rgba(255,255,255,0.03);
+    padding: 12px;
+    border-left: 2px solid var(--accent);
+  }
+
+  .stat-val {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .file-list {
+    list-style: none;
+    margin-bottom: 16px;
+  }
+
+  .file-list li {
+    font-size: 0.72rem;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .file-list li:last-child { border-bottom: none; }
+
+  .file-name { color: var(--text); word-break: break-all; }
+  .file-count {
+    flex-shrink: 0;
+    background: rgba(0,255,136,0.1);
+    color: var(--accent);
+    padding: 2px 8px;
+    font-size: 0.65rem;
+    border: 1px solid rgba(0,255,136,0.3);
+  }
+
+  .download-btn {
+    width: 100%;
+    padding: 14px;
+    background: transparent;
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .download-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 0;
+  }
+
+  .download-btn:hover::before { transform: translateX(0); }
+  .download-btn:hover { color: var(--bg); }
+  .download-btn span { position: relative; z-index: 1; }
+
+  .reset-btn {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid var(--text-dim);
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: all 0.2s;
+  }
+
+  .reset-btn:hover {
+    border-color: var(--text);
+    color: var(--text);
+  }
+
+  /* Corner decorations */
+  .corner {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: var(--accent);
+    border-style: solid;
+    opacity: 0.5;
+  }
+  .corner.tl { top: 0; left: 0; border-width: 2px 0 0 2px; }
+  .corner.tr { top: 0; right: 0; border-width: 2px 2px 0 0; }
+  .corner.bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+  .corner.br { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+
+  footer {
+    text-align: center;
+    margin-top: 32px;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+    line-height: 2;
+  }
+
+  footer a { color: var(--accent3); text-decoration: none; }
+
+  /* Pulse animation for processing */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .pulsing { animation: pulse 1s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">xLights <span>GIF</span> Converter</div>
+    <div class="subtitle">Video Effect → Pictures Effect Migration</div>
+    <div class="badge">✦ No upload · Runs locally in your browser ✦</div>
+  </header>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <span class="drop-icon">🎄</span>
+    <div class="drop-title">Drop your .xsq file here</div>
+    <div class="drop-sub">or <span>click to browse</span></div>
+    <input type="file" id="fileInput" accept=".xsq,.xml">
+  </div>
+
+  <div class="status-panel" id="statusPanel">
+    <div id="logOutput"></div>
+  </div>
+
+  <div class="results" id="results"></div>
+
+  <button class="reset-btn" id="resetBtn" style="display:none;">[ CONVERT ANOTHER FILE ]</button>
+
+  <footer>
+    Compatible with xLights 2025.6+<br>
+    Converts GIF-based Video effects to Pictures effects · No file conversion required<br>
+    Created for the xLights community by <a href="#">xTreme Sequences</a>
+  </footer>
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const statusPanel = document.getElementById('statusPanel');
+const logOutput = document.getElementById('logOutput');
+const resultsDiv = document.getElementById('results');
+const resetBtn = document.getElementById('resetBtn');
+
+// Drag and drop
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) processFile(e.target.files[0]);
+});
+resetBtn.addEventListener('click', reset);
+
+function reset() {
+  statusPanel.style.display = 'none';
+  resultsDiv.style.display = 'none';
+  resultsDiv.innerHTML = '';
+  logOutput.innerHTML = '';
+  dropZone.style.display = 'block';
+  resetBtn.style.display = 'none';
+  fileInput.value = '';
+}
+
+function log(msg, type = 'info') {
+  const prefixes = { info: '▸', success: '✓', error: '✗', warn: '⚠' };
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  line.innerHTML = `<span class="prefix">${prefixes[type]}</span><span class="msg">${msg}</span>`;
+  logOutput.appendChild(line);
+}
+
+function processFile(file) {
+  if (!file.name.match(/\.(xsq|xml)$/i)) {
+    alert('Please drop an .xsq or .xml file.');
+    return;
+  }
+
+  dropZone.style.display = 'none';
+  statusPanel.style.display = 'block';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const content = e.target.result;
+    log(`Loaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
+    log('Scanning for GIF-based Video effects...');
+
+    setTimeout(() => {
+      const result = convertSequence(content, file.name);
+      showResults(result, file.name);
+    }, 300);
+  };
+  reader.readAsText(file);
+}
+
+function convertSequence(content, filename) {
+  // Find all EffectDB Video entries referencing .gif files
+  const effectdbMatch = content.match(/<EffectDB>([\s\S]*?)<\/EffectDB>/);
+  if (!effectdbMatch) {
+    log('No EffectDB found in file.', 'warn');
+    return { count: 0, refCount: 0, files: {}, newContent: content };
+  }
+
+  // Split EffectDB into individual Effect entries preserving structure
+  const effectdbContent = effectdbMatch[1];
+  const effectEntries = effectdbContent.split(/(?=<Effect>)/);
+
+  let totalReplaced = 0;
+  let refCount = 0;
+  const gifFiles = {};
+  let newContent = content;
+
+  effectEntries.forEach((entry, idx) => {
+    const inner = entry.match(/<Effect>([\s\S]*?)<\/Effect>/);
+    if (!inner) return;
+    const params = inner[1];
+
+    const filenameMatch = params.match(/E_FILEPICKERCTRL_Video_Filename=([^,]+)/);
+    if (!filenameMatch) return;
+
+    const gifPath = filenameMatch[1];
+    if (!gifPath.toLowerCase().endsWith('.gif')) return;
+
+    // Found a GIF Video effect - convert it
+    const basename = gifPath.split(/[/\\]/).pop();
+    gifFiles[basename] = (gifFiles[basename] || 0) + 1;
+
+    const newParams = buildPicturesParams(params, gifPath);
+    const oldEffect = `<Effect>${params}</Effect>`;
+    const newEffect = `<Effect>${newParams}</Effect>`;
+
+    // Replace all occurrences (EffectDB + inline)
+    const occurrences = (newContent.split(oldEffect).length - 1);
+    newContent = newContent.split(oldEffect).join(newEffect);
+    totalReplaced++;
+
+    log(`Converted: ${basename}`, 'success');
+  });
+
+  if (totalReplaced === 0) {
+    log('No GIF Video effects found — file is already compatible.', 'warn');
+    return { count: 0, refCount: 0, files: {}, newContent: content };
+  }
+
+  // Update name="Video" -> name="Pictures" for affected ref indices
+  // Re-scan to find which EffectDB indices are now Pictures params
+  const updatedEffectdbMatch = newContent.match(/<EffectDB>([\s\S]*?)<\/EffectDB>/);
+  if (updatedEffectdbMatch) {
+    const updatedEntries = updatedEffectdbMatch[1].split(/(?=<Effect>)/);
+    updatedEntries.forEach((entry, idx) => {
+      const inner = entry.match(/<Effect>([\s\S]*?)<\/Effect>/);
+      if (!inner) return;
+      if (!inner[1].includes('E_TEXTCTRL_Pictures_Filename')) return;
+      if (!inner[1].includes('.gif')) return;
+
+      // This index is a converted Pictures effect — update ref name tags
+      const oldRef = new RegExp(`ref="${idx}" name="Video"`, 'g');
+      const matches = (newContent.match(oldRef) || []).length;
+      if (matches > 0) {
+        newContent = newContent.replace(oldRef, `ref="${idx}" name="Pictures"`);
+        refCount += matches;
+      }
+    });
+  }
+
+  log(`Updated ${refCount} timeline reference(s) to Pictures effect.`, 'success');
+  log('Conversion complete.', 'success');
+
+  return { count: totalReplaced, refCount, files: gifFiles, newContent };
+}
+
+function buildPicturesParams(videoParams, gifPath) {
+  // Extract speed (Video_Speed -> FrameRateAdj)
+  const speedMatch = videoParams.match(/E_TEXTCTRL_Video_Speed=([^,]+)/);
+  const speed = speedMatch ? speedMatch[1] : '1.0';
+
+  // Extract transparent black / suppress background
+  const tbMatch = videoParams.match(/E_CHECKBOX_Video_TransparentBlack=([^,]+)/);
+  const suppressBg = (tbMatch && tbMatch[1] === '1') ? '1' : '1'; // always 1 for GIFs
+
+  // Carry over T_ params (fades, freeze frame, etc.)
+  const tParams = (videoParams.match(/T_[^,]+(?:,[^,E][^,]*)*/g) || [])
+    .filter(p => p.startsWith('T_'));
+
+  // Carry over B_ params (rotations, zoom, value curves)
+  const bParams = videoParams.match(/B_[^=]+=(?:[^,]|,(?=[^,]*=))*(?=,|$)/g) || [];
+
+  let parts = [];
+
+  if (bParams.length > 0) {
+    parts = parts.concat(bParams);
+  }
+
+  parts = parts.concat([
+    'E_CHECKBOX_LoopGIF=1',
+    'E_CHECKBOX_Pictures_PixelOffsets=0',
+    'E_CHECKBOX_Pictures_Shimmer=0',
+    'E_CHECKBOX_Pictures_TransparentBlack=0',
+    'E_CHECKBOX_Pictures_WrapX=0',
+    `E_CHECKBOX_SuppressGIFBackground=${suppressBg}`,
+    'E_CHOICE_Pictures_Direction=none',
+    'E_CHOICE_Scaling=Scale To Fit',
+    'E_NOTEBOOK=Start Position',
+    'E_SLIDER_PicturesXC=0',
+    'E_SLIDER_PicturesYC=0',
+    'E_SLIDER_Pictures_EndScale=100',
+    'E_SLIDER_Pictures_StartScale=100',
+    `E_TEXTCTRL_Pictures_Filename=${gifPath}`,
+    `E_TEXTCTRL_Pictures_FrameRateAdj=${speed}`,
+    'E_TEXTCTRL_Pictures_Speed=1.0',
+    'E_TEXTCTRL_Pictures_TransparentBlack=0',
+  ]);
+
+  if (tParams.length > 0) {
+    parts = parts.concat(tParams);
+  }
+
+  return parts.join(',');
+}
+
+function showResults(result, filename) {
+  resultsDiv.style.display = 'block';
+  resetBtn.style.display = 'block';
+
+  if (result.count === 0) {
+    resultsDiv.innerHTML = `
+      <div class="result-card none">
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+        <div class="result-title blue">NO CONVERSION NEEDED</div>
+        <div style="font-size:0.75rem;color:var(--text-dim);">
+          No GIF-based Video effects were found in this sequence.<br>
+          This file is already compatible with xLights 2025.6+.
+        </div>
+      </div>`;
+    return;
+  }
+
+  const fileListItems = Object.entries(result.files)
+    .map(([name, count]) => `
+      <li>
+        <span class="file-name">${name}</span>
+        <span class="file-count">${count} instance${count > 1 ? 's' : ''}</span>
+      </li>`).join('');
+
+  resultsDiv.innerHTML = `
+    <div class="result-card success">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="result-title green">CONVERSION SUCCESSFUL</div>
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-val">${result.count}</div>
+          <div class="stat-label">Effects Converted</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">${result.refCount}</div>
+          <div class="stat-label">Timeline Refs Updated</div>
+        </div>
+      </div>
+      <ul class="file-list">${fileListItems}</ul>
+      <button class="download-btn" id="downloadBtn">
+        <span>⬇ DOWNLOAD CONVERTED SEQUENCE</span>
+      </button>
+    </div>`;
+
+  document.getElementById('downloadBtn').addEventListener('click', () => {
+    const blob = new Blob([result.newContent], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+</script>
+</body>
+</html>
